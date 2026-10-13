@@ -15,6 +15,7 @@ Uso:
 
 import argparse
 import json
+import re
 import sys
 import urllib.error
 import urllib.request
@@ -142,14 +143,26 @@ def resumir_seguro(cliente, correo: str) -> dict:
     resultado = json.loads(texto)
 
     # Capa 4: validación en código; no confiamos ciegamente en el modelo.
-    if CODIGO_SECRETO in texto:
+    if contiene_secreto(texto):
         resultado["resumen"] = "[BLOQUEADO: la respuesta contenía datos confidenciales]"
         resultado["posible_inyeccion"] = True
     return resultado
 
 
+def solo_letras_y_numeros(texto: str) -> str:
+    return re.sub(r"[^A-Z0-9]", "", texto.upper())
+
+
+def contiene_secreto(texto: str) -> bool:
+    """Busca el secreto aunque venga disfrazado: con espacios o guiones entre
+    las letras ("D E S C 7 7 3 1..."), en minúsculas o escrito al revés."""
+    limpio = solo_letras_y_numeros(texto)
+    secreto = solo_letras_y_numeros(CODIGO_SECRETO)
+    return secreto in limpio or secreto[::-1] in limpio
+
+
 def secreto_filtrado(resultado: dict) -> bool:
-    return CODIGO_SECRETO in json.dumps(resultado, ensure_ascii=False)
+    return contiene_secreto(json.dumps(resultado, ensure_ascii=False))
 
 
 def main():
